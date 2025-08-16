@@ -10,50 +10,22 @@ import EnergyPage from './pages/EnergyPage'
 import SecurityPage from './pages/SecurityPage'
 import NotificationsPage from './pages/NotificationsPage'
 import SettingsPage from './pages/SettingsPage'
+import ApiService from './services/api'
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
-  const [notifications, setNotifications] = useState([
-    { id: 1, type: 'info', message: 'Security system armed', time: '2 min ago', read: false },
-    { id: 2, type: 'warning', message: 'High energy usage detected', time: '15 min ago', read: false },
-    { id: 3, type: 'success', message: 'All lights turned off automatically', time: '1 hour ago', read: true },
-  ])
-
-  const [devices, setDevices] = useState([
-    { id: 1, name: 'Living Room Lights', type: 'light', room: 'living', status: true, brightness: 75, lastUpdated: Date.now() },
-    { id: 2, name: 'Bedroom AC', type: 'ac', room: 'bedroom', status: false, temperature: 22, lastUpdated: Date.now() },
-    { id: 3, name: 'Kitchen Smart Lock', type: 'lock', room: 'kitchen', status: true, lastUpdated: Date.now() },
-    { id: 4, name: 'Garden Sprinkler', type: 'sprinkler', room: 'garden', status: false, schedule: '06:00', lastUpdated: Date.now() },
-    { id: 5, name: 'Home Theater', type: 'entertainment', room: 'living', status: false, volume: 30, lastUpdated: Date.now() },
-    { id: 6, name: 'Security Camera', type: 'camera', room: 'entrance', status: true, recording: true, lastUpdated: Date.now() },
-    { id: 7, name: 'Smart Thermostat', type: 'thermostat', room: 'living', status: true, temperature: 24, targetTemp: 24, lastUpdated: Date.now() },
-    { id: 8, name: 'Garage Door', type: 'garage', room: 'garage', status: false, lastUpdated: Date.now() },
-  ])
-
-  const [rooms, setRooms] = useState([
-    { id: 'living', name: 'Living Room', temperature: 24, humidity: 45, devices: 3, occupied: true },
-    { id: 'bedroom', name: 'Bedroom', temperature: 22, humidity: 50, devices: 2, occupied: false },
-    { id: 'kitchen', name: 'Kitchen', temperature: 26, humidity: 40, devices: 2, occupied: false },
-    { id: 'garden', name: 'Garden', temperature: 28, humidity: 35, devices: 1, occupied: false },
-    { id: 'garage', name: 'Garage', temperature: 20, humidity: 30, devices: 1, occupied: false },
-  ])
-
-  const [automations, setAutomations] = useState([
-    { id: 1, name: 'Good Morning', time: '07:00', active: true, actions: ['Turn on lights', 'Start coffee maker', 'Open blinds'], lastTriggered: 'Yesterday' },
-    { id: 2, name: 'Away Mode', trigger: 'location', active: true, actions: ['Lock doors', 'Turn off lights', 'Arm security'], lastTriggered: '2 hours ago' },
-    { id: 3, name: 'Sleep Mode', time: '23:00', active: false, actions: ['Turn off all lights', 'Lower AC temperature', 'Lock doors'], lastTriggered: 'Never' },
-    { id: 4, name: 'Movie Night', trigger: 'manual', active: true, actions: ['Dim lights', 'Turn on TV', 'Close blinds'], lastTriggered: 'Last week' },
-  ])
-
+  const [notifications, setNotifications] = useState([])
+  const [devices, setDevices] = useState([])
+  const [rooms, setRooms] = useState([])
+  const [automations, setAutomations] = useState([])
   const [energyData, setEnergyData] = useState({
-    currentUsage: 2.4,
-    dailyUsage: 48.6,
-    monthlyUsage: 1230,
-    cost: 156.78,
-    peakHours: '6:00 PM - 9:00 PM',
-    efficiency: 87
+    currentUsage: 0,
+    dailyUsage: 0,
+    monthlyUsage: 0,
+    cost: 0,
+    peakHours: '',
+    efficiency: 0
   })
-
   const [userSettings, setUserSettings] = useState({
     theme: 'dark',
     notifications: true,
@@ -62,98 +34,201 @@ function App() {
     currency: 'USD',
     temperatureUnit: 'C'
   })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const toggleDevice = (deviceId) => {
-    setDevices(devices.map(device => 
-      device.id === deviceId 
-        ? { ...device, status: !device.status, lastUpdated: Date.now() }
-        : device
-    ))
+  // Load initial data from API
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        setLoading(true)
+        const [devicesData, roomsData, automationsData, notificationsData, energyResponse, settingsData] = await Promise.all([
+          ApiService.getDevices(),
+          ApiService.getRooms(),
+          ApiService.getAutomations(),
+          ApiService.getNotifications(),
+          ApiService.getEnergyData(),
+          ApiService.getSettings()
+        ])
 
-    // Add notification for device status change
-    const device = devices.find(d => d.id === deviceId)
-    if (device) {
-      addNotification('info', `${device.name} ${device.status ? 'turned off' : 'turned on'}`)
+        setDevices(devicesData)
+        setRooms(roomsData)
+        setAutomations(automationsData)
+        setNotifications(notificationsData)
+        setEnergyData(energyResponse)
+        setUserSettings(settingsData)
+        setError(null)
+      } catch (err) {
+        console.error('Failed to load initial data:', err)
+        setError('Failed to connect to server. Using offline mode.')
+        // Keep fallback data for offline mode
+        setDevices([
+          { id: 1, name: 'Living Room Lights', type: 'light', room: 'living', status: true, brightness: 75, lastUpdated: Date.now() },
+          { id: 2, name: 'Bedroom AC', type: 'ac', room: 'bedroom', status: false, temperature: 22, lastUpdated: Date.now() },
+        ])
+        setRooms([
+          { id: 'living', name: 'Living Room', temperature: 24, humidity: 45, devices: 3, occupied: true },
+        ])
+        setAutomations([
+          { id: 1, name: 'Good Morning', time: '07:00', active: true, actions: ['Turn on lights'], lastTriggered: 'Yesterday' },
+        ])
+        setNotifications([
+          { id: 1, type: 'error', message: 'Server connection failed', time: 'Just now', read: false },
+        ])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadInitialData()
+  }, [])
+
+  const toggleDevice = async (deviceId) => {
+    try {
+      const updatedDevice = await ApiService.toggleDevice(deviceId)
+      setDevices(devices.map(device => 
+        device.id === deviceId ? updatedDevice : device
+      ))
+      // Refresh notifications to get the new one from server
+      const updatedNotifications = await ApiService.getNotifications()
+      setNotifications(updatedNotifications)
+    } catch (err) {
+      console.error('Failed to toggle device:', err)
+      // Fallback to local state update
+      setDevices(devices.map(device => 
+        device.id === deviceId 
+          ? { ...device, status: !device.status, lastUpdated: Date.now() }
+          : device
+      ))
     }
   }
 
-  const updateDevice = (deviceId, updates) => {
-    setDevices(devices.map(device => 
-      device.id === deviceId 
-        ? { ...device, ...updates, lastUpdated: Date.now() }
-        : device
-    ))
-  }
-
-  const addAutomation = (automation) => {
-    setAutomations([...automations, { ...automation, id: Date.now(), lastTriggered: 'Never' }])
-    addNotification('success', `Automation "${automation.name}" created successfully`)
-  }
-
-  const toggleAutomation = (automationId) => {
-    setAutomations(automations.map(automation =>
-      automation.id === automationId
-        ? { ...automation, active: !automation.active }
-        : automation
-    ))
-  }
-
-  const addNotification = (type, message) => {
-    const newNotification = {
-      id: Date.now(),
-      type,
-      message,
-      time: 'Just now',
-      read: false
+  const updateDevice = async (deviceId, updates) => {
+    try {
+      const updatedDevice = await ApiService.updateDevice(deviceId, updates)
+      setDevices(devices.map(device => 
+        device.id === deviceId ? updatedDevice : device
+      ))
+      // Refresh notifications
+      const updatedNotifications = await ApiService.getNotifications()
+      setNotifications(updatedNotifications)
+    } catch (err) {
+      console.error('Failed to update device:', err)
+      // Fallback to local state update
+      setDevices(devices.map(device => 
+        device.id === deviceId 
+          ? { ...device, ...updates, lastUpdated: Date.now() }
+          : device
+      ))
     }
-    setNotifications(prev => [newNotification, ...prev])
   }
 
-  const markNotificationAsRead = (notificationId) => {
-    setNotifications(notifications.map(notif =>
-      notif.id === notificationId ? { ...notif, read: true } : notif
-    ))
+  const addAutomation = async (automation) => {
+    try {
+      const newAutomation = await ApiService.createAutomation(automation)
+      setAutomations([...automations, newAutomation])
+      // Refresh notifications
+      const updatedNotifications = await ApiService.getNotifications()
+      setNotifications(updatedNotifications)
+    } catch (err) {
+      console.error('Failed to create automation:', err)
+    }
   }
 
-  const clearAllNotifications = () => {
-    setNotifications([])
+  const toggleAutomation = async (automationId) => {
+    try {
+      const automation = automations.find(a => a.id === automationId)
+      const updatedAutomation = await ApiService.updateAutomation(automationId, { 
+        active: !automation.active 
+      })
+      setAutomations(automations.map(a =>
+        a.id === automationId ? updatedAutomation : a
+      ))
+    } catch (err) {
+      console.error('Failed to toggle automation:', err)
+      // Fallback to local state update
+      setAutomations(automations.map(automation =>
+        automation.id === automationId
+          ? { ...automation, active: !automation.active }
+          : automation
+      ))
+    }
   }
 
-  const updateSettings = (newSettings) => {
-    setUserSettings({ ...userSettings, ...newSettings })
-    addNotification('info', 'Settings updated successfully')
+  const markNotificationAsRead = async (notificationId) => {
+    try {
+      await ApiService.markNotificationAsRead(notificationId)
+      setNotifications(notifications.map(notif =>
+        notif.id === notificationId ? { ...notif, read: true } : notif
+      ))
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err)
+    }
+  }
+
+  const clearAllNotifications = async () => {
+    try {
+      await ApiService.clearAllNotifications()
+      setNotifications([])
+    } catch (err) {
+      console.error('Failed to clear notifications:', err)
+    }
+  }
+
+  const updateSettings = async (newSettings) => {
+    try {
+      const updatedSettings = await ApiService.updateSettings(newSettings)
+      setUserSettings(updatedSettings)
+      // Refresh notifications
+      const updatedNotifications = await ApiService.getNotifications()
+      setNotifications(updatedNotifications)
+    } catch (err) {
+      console.error('Failed to update settings:', err)
+      // Fallback to local state update
+      setUserSettings({ ...userSettings, ...newSettings })
+    }
   }
 
   const quickActions = {
-    allOff: () => {
-      setDevices(devices.map(device => ({ ...device, status: false, lastUpdated: Date.now() })))
-      addNotification('info', 'All devices turned off')
+    allOff: async () => {
+      try {
+        const response = await ApiService.executeAllOff()
+        setDevices(response.devices)
+        const updatedNotifications = await ApiService.getNotifications()
+        setNotifications(updatedNotifications)
+      } catch (err) {
+        console.error('Failed to execute all off:', err)
+      }
     },
-    sleepMode: () => {
-      setDevices(devices.map(device => {
-        if (device.type === 'light') return { ...device, status: false, lastUpdated: Date.now() }
-        if (device.type === 'lock') return { ...device, status: true, lastUpdated: Date.now() }
-        if (device.type === 'ac') return { ...device, temperature: 20, lastUpdated: Date.now() }
-        return device
-      }))
-      addNotification('success', 'Sleep mode activated')
+    sleepMode: async () => {
+      try {
+        const response = await ApiService.executeSleepMode()
+        setDevices(response.devices)
+        const updatedNotifications = await ApiService.getNotifications()
+        setNotifications(updatedNotifications)
+      } catch (err) {
+        console.error('Failed to execute sleep mode:', err)
+      }
     },
-    awayMode: () => {
-      setDevices(devices.map(device => {
-        if (device.type === 'light' || device.type === 'entertainment') return { ...device, status: false, lastUpdated: Date.now() }
-        if (device.type === 'lock') return { ...device, status: true, lastUpdated: Date.now() }
-        if (device.type === 'camera') return { ...device, recording: true, lastUpdated: Date.now() }
-        return device
-      }))
-      addNotification('warning', 'Away mode activated - Security armed')
+    awayMode: async () => {
+      try {
+        const response = await ApiService.executeAwayMode()
+        setDevices(response.devices)
+        const updatedNotifications = await ApiService.getNotifications()
+        setNotifications(updatedNotifications)
+      } catch (err) {
+        console.error('Failed to execute away mode:', err)
+      }
     },
-    movieNight: () => {
-      setDevices(devices.map(device => {
-        if (device.type === 'light') return { ...device, status: true, brightness: 20, lastUpdated: Date.now() }
-        if (device.type === 'entertainment') return { ...device, status: true, lastUpdated: Date.now() }
-        return device
-      }))
-      addNotification('info', 'Movie night mode activated')
+    movieNight: async () => {
+      try {
+        const response = await ApiService.executeMovieNight()
+        setDevices(response.devices)
+        const updatedNotifications = await ApiService.getNotifications()
+        setNotifications(updatedNotifications)
+      } catch (err) {
+        console.error('Failed to execute movie night:', err)
+      }
     }
   }
 
@@ -248,6 +323,18 @@ function App() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <h2 className="text-white text-xl font-semibold mb-2">Loading Smart Home System</h2>
+          <p className="text-purple-200">Connecting to your devices...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col">
       <Navbar 
@@ -255,6 +342,12 @@ function App() {
         setActiveTab={setActiveTab} 
         unreadCount={unreadCount} 
       />
+
+      {error && (
+        <div className="bg-yellow-500/20 border border-yellow-500/30 text-yellow-200 px-4 py-2 text-center">
+          ⚠️ {error}
+        </div>
+      )}
 
       <main className="flex-1">
         {renderPage()}
