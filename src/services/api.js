@@ -6,20 +6,28 @@ class ApiService {
     const config = {
       headers: {
         'Content-Type': 'application/json',
+        ...(options.headers || {}),
       },
       ...options,
     };
+
+    if (options.body) {
+      config.body = JSON.stringify(options.body);
+    }
 
     try {
       const response = await fetch(url, config);
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || `HTTP error! status: ${response.status}`
+        );
       }
 
       return await response.json();
     } catch (error) {
-      console.error('API request failed:', error);
+      console.error(`API request to ${endpoint} failed:`, error);
       throw error;
     }
   }
@@ -41,7 +49,7 @@ class ApiService {
   async updateDevice(id, updates) {
     return this.request(`/devices/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(updates),
+      body: updates,
     });
   }
 
@@ -63,7 +71,7 @@ class ApiService {
   async updateRoom(id, updates) {
     return this.request(`/rooms/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(updates),
+      body: updates,
     });
   }
 
@@ -75,14 +83,14 @@ class ApiService {
   async createAutomation(automation) {
     return this.request('/automations', {
       method: 'POST',
-      body: JSON.stringify(automation),
+      body: automation,
     });
   }
 
   async updateAutomation(id, updates) {
     return this.request(`/automations/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(updates),
+      body: updates,
     });
   }
 
@@ -122,7 +130,7 @@ class ApiService {
   async updateSettings(settings) {
     return this.request('/settings', {
       method: 'PUT',
-      body: JSON.stringify(settings),
+      body: settings,
     });
   }
 
@@ -154,71 +162,71 @@ class ApiService {
   // User Management
   async getUsers() {
     return this.request('/users');
-  },
+  }
 
   async getUser(id) {
     return this.request(`/users/${id}`);
-  },
+  }
 
   async createUser(userData) {
     return this.request('/users', {
       method: 'POST',
-      body: JSON.stringify(userData),
+      body: userData,
     });
-  },
+  }
 
   async updateUser(id, userData) {
     return this.request(`/users/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(userData),
+      body: userData,
     });
-  },
+  }
 
   async deleteUser(id) {
     return this.request(`/users/${id}`, {
       method: 'DELETE',
     });
-  },
+  }
 
   // Scene Management
   async getScenes() {
     return this.request('/scenes');
-  },
+  }
 
   async createScene(sceneData) {
     return this.request('/scenes', {
       method: 'POST',
-      body: JSON.stringify(sceneData),
+      body: sceneData,
     });
-  },
+  }
 
   async updateScene(id, sceneData) {
     return this.request(`/scenes/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(sceneData),
+      body: sceneData,
     });
-  },
+  }
 
   async deleteScene(id) {
     return this.request(`/scenes/${id}`, {
       method: 'DELETE',
     });
-  },
+  }
 
   async activateScene(id) {
     return this.request(`/scenes/${id}/activate`, {
       method: 'POST',
     });
-  },
+  }
 
   // Analytics
   async getDeviceAnalytics() {
     return this.request('/analytics/devices');
-  },
+  }
 
   async getRoomAnalytics() {
     return this.request('/analytics/rooms');
-  },
+  }
 }
 
 export default new ApiService();
